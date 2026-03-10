@@ -16,7 +16,19 @@ Polona printer Bluetooth driver for printing from a browser without downloading 
 
 > **Note:** Some browsers block the Web Bluetooth API when the page is loaded from a `file://` URL. If the *Connect Printer* button doesn't work, use Option 2 below.
 
-### Option 2 — Serve with a local HTTP server (recommended)
+### Option 2 — Deploy to Render (hosted, always-on)
+
+This repository includes a `render.yaml` configuration file so you can deploy the app as a free static site on [Render](https://render.com) in a few clicks:
+
+1. Fork or push this repository to your GitHub account.
+2. Log in to [Render](https://render.com) and click **New → Blueprint**.
+3. Connect your GitHub account and select this repository.
+4. Render will detect `render.yaml` automatically and create a **Static Site** service called `polona-printer`.
+5. Click **Apply** — your site will be live at a `*.onrender.com` URL within a minute.
+
+> **Note:** Render serves the site over HTTPS, which is required for the Web Bluetooth API to work in Chromium-based browsers.
+
+### Option 3 — Serve with a local HTTP server (recommended for local development)
 
 A local server ensures the Web Bluetooth API works correctly. Pick whichever option matches what you have installed:
 
