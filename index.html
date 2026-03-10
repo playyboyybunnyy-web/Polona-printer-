@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Polona Bluetooth Printer</title>
+  <!--
+    PDF.js – renders PDF pages to an off-screen canvas.
+    We load the standard "legacy" build so it works without bundlers.
+  -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #f5f5f0;
+      --card:    #ffffff;
+      --accent:  #2563eb;
+      --accent2: #1d4ed8;
+      --danger:  #dc2626;
+      --success: #16a34a;
+      --text:    #1e293b;
+      --muted:   #64748b;
+      --border:  #e2e8f0;
+      --radius:  0.5rem;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    header h1 { font-size: 1.75rem; font-weight: 700; }
+    header p  { color: var(--muted); margin-top: 0.25rem; font-size: 0.9rem; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+      max-width: 680px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+
+    .row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border: none;
+      border-radius: var(--radius);
+      padding: 0.55rem 1.1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-primary   { background: var(--accent);  color: #fff; }
+    .btn-primary:hover:not(:disabled)  { background: var(--accent2); }
+    .btn-danger    { background: var(--danger);  color: #fff; }
+    .btn-danger:hover:not(:disabled)   { background: #b91c1c; }
+    .btn-success   { background: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled)  { background: #15803d; }
+    .btn-secondary { background: #e2e8f0; color: var(--text); }
+    .btn-secondary:hover:not(:disabled){ background: #cbd5e1; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-green  { background: #dcfce7; color: #166534; }
+    .badge-gray   { background: #f1f5f9; color: var(--muted); }
+    .badge-yellow { background: #fef9c3; color: #854d0e; }
+
+    label.file-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 0.6rem 1rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: var(--muted);
+      transition: border-color 0.15s, color 0.15s;
+    }
+    label.file-label:hover { border-color: var(--accent); color: var(--accent); }
+    input[type="file"] { display: none; }
+
+    .options { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+    .options label { font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; gap: 0.35rem; }
+    select {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.3rem 0.5rem;
+      font-size: 0.85rem;
+      background: var(--card);
+      color: var(--text);
+    }
+
+    #log-box {
+      background: #0f172a;
+      color: #94a3b8;
+      font-family: monospace;
+      font-size: 0.78rem;
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      height: 9rem;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+    #log-box .ok    { color: #4ade80; }
+    #log-box .err   { color: #f87171; }
+    #log-box .warn  { color: #fbbf24; }
+    #log-box .info  { color: #93c5fd; }
+
+    #previews {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .preview-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .preview-item canvas {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      max-width: 180px;
+      image-rendering: pixelated;
+    }
+
+    .progress-bar-outer {
+      background: var(--border);
+      border-radius: 9999px;
+      height: 6px;
+      width: 100%;
+      margin-top: 0.5rem;
+      display: none;
+    }
+    .progress-bar-inner {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 9999px;
+      width: 0%;
+      transition: width 0.2s;
+    }
+
+    .compatibility-note {
+      background: #fef9c3;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      font-size: 0.82rem;
+      color: #78350f;
+      max-width: 680px;
+      margin: 0 auto 1.25rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🖨️ Polona Bluetooth Printer</h1>
+  <p>Connect your BLE thermal printer and print PDFs directly from the browser</p>
+</header>
+
+<div class="compatibility-note">
+  ⚠️ <strong>Browser requirement:</strong> Web Bluetooth is supported in <strong>Chrome / Edge / Opera</strong> on desktop and Android.
+  It is <em>not</em> available in Safari or Firefox.
+</div>
+
+<!-- ── Connection card ─────────────────────────────────── -->
+<div class="card">
+  <h2>Printer Connection</h2>
+  <div class="row">
+    <button id="btn-connect" class="btn-primary" onclick="connectPrinter()">
+      🔗 Connect Printer
+    </button>
+    <button id="btn-disconnect" class="btn-danger" onclick="disconnectPrinter()" disabled>
+      ✕ Disconnect
+    </button>
+    <span id="conn-badge" class="badge badge-gray">Disconnected</span>
+  </div>
+
+  <div class="options" style="margin-top:0.9rem;">
+    <label>
+      Paper width:
+      <select id="paper-width">
+        <option value="384">58 mm (384 px)</option>
+        <option value="576" selected>80 mm (576 px)</option>
+      </select>
+    </label>
+    <label>
+      Dithering:
+      <select id="dither-mode">
+        <option value="fs" selected>Floyd-Steinberg</option>
+        <option value="threshold">Threshold</option>
+        <option value="atkinson">Atkinson</option>
+      </select>
+    </label>
+    <label>
+      Darkness:
+      <select id="darkness">
+        <option value="100">100%</option>
+        <option value="110" selected>110%</option>
+        <option value="120">120%</option>
+        <option value="130">130%</option>
+      </select>
+    </label>
+  </div>
+</div>
+
+<!-- ── Print card ──────────────────────────────────────── -->
+<div class="card">
+  <h2>Print PDF</h2>
+  <div class="row">
+    <label class="file-label" for="pdf-input">
+      📄 Choose PDF…
+    </label>
+    <input type="file" id="pdf-input" accept=".pdf,application/pdf" onchange="onFileSelected(event)" />
+    <span id="file-name" style="font-size:0.85rem; color:var(--muted);">No file selected</span>
+  </div>
+
+  <div class="progress-bar-outer" id="progress-outer">
+    <div class="progress-bar-inner" id="progress-inner"></div>
+  </div>
+
+  <div style="margin-top:1rem;">
+    <button id="btn-print" class="btn-success" onclick="printPDF()" disabled>
+      🖨️ Print PDF
+    </button>
+    <button id="btn-preview" class="btn-secondary" onclick="previewPDF()" disabled style="margin-left:0.5rem;">
+      👁 Preview
+    </button>
+  </div>
+
+  <div id="previews"></div>
+</div>
+
+<!-- ── Log card ────────────────────────────────────────── -->
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+    <h2 style="margin:0;">Status Log</h2>
+    <button class="btn-secondary" style="font-size:0.78rem; padding:0.2rem 0.6rem;" onclick="clearLog()">Clear</button>
+  </div>
+  <div id="log-box"></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════ -->
+<script>
+/* ──────────────────────────────────────────────────────
+   PDF.js worker setup
+   ────────────────────────────────────────────────────── */
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ──────────────────────────────────────────────────────
+   BLE UUIDs – tried in order of commonness
+   ────────────────────────────────────────────────────── */
+const BLE_PROFILES = [
+  // Nordic UART Service (widely used by generic thermal printers)
+  {
+    name: 'Nordic UART',
+    service:  '6e400001-b5b3-f393-e0a9-e50e24dcca9e',
+    write:    '6e400002-b5b3-f393-e0a9-e50e24dcca9e',
+    notify:   '6e400003-b5b3-f393-e0a9-e50e24dcca9e',
+  },
+  // Generic 0xFF00 service (PeriPage, many Chinese mini printers)
+  {
+    name: 'Generic FF00',
+    service:  '0000ff00-0000-1000-8000-00805f9b34fb',
+    write:    '0000ff02-0000-1000-8000-00805f9b34fb',
+    notify:   '0000ff01-0000-1000-8000-00805f9b34fb',
+  },
+  // PrinterV2 service (various receipt printers)
+  {
+    name: 'PrinterV2',
+    service:  'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+    write:    'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
+    notify:   null,
+  },
+  // 18F0 service (Star Micronics, some ESC/POS printers)
+  {
+    name: '18F0',
+    service:  '000018f0-0000-1000-8000-00805f9b34fb',
+    write:    '00002af1-0000-1000-8000-00805f9b34fb',
+    notify:   null,
+  },
+];
+
+/* ──────────────────────────────────────────────────────
+   Global state
+   ────────────────────────────────────────────────────── */
+let bleDevice        = null;
+let bleChar          = null;   // writable characteristic
+let pdfDoc           = null;
+let currentFile      = null;
+
+/* ──────────────────────────────────────────────────────
+   Logging helpers
+   ────────────────────────────────────────────────────── */
+function log(msg, type = '') {
+  const box  = document.getElementById('log-box');
+  const line = document.createElement('div');
+  if (type) line.className = type;
+  const ts = new Date().toLocaleTimeString();
+  line.textContent = `[${ts}] ${msg}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+  console.log(msg);
+}
+const logOk   = m => log(m, 'ok');
+const logErr  = m => log(m, 'err');
+const logWarn = m => log(m, 'warn');
+const logInfo = m => log(m, 'info');
+function clearLog() { document.getElementById('log-box').innerHTML = ''; }
+
+/* ──────────────────────────────────────────────────────
+   UI helpers
+   ────────────────────────────────────────────────────── */
+function setConnected(connected) {
+  const badge = document.getElementById('conn-badge');
+  document.getElementById('btn-connect').disabled    = connected;
+  document.getElementById('btn-disconnect').disabled = !connected;
+  if (connected) {
+    badge.textContent = 'Connected';
+    badge.className   = 'badge badge-green';
+  } else {
+    badge.textContent = 'Disconnected';
+    badge.className   = 'badge badge-gray';
+  }
+  updatePrintButton();
+}
+
+function updatePrintButton() {
+  const hasPDF     = pdfDoc !== null;
+  const connected  = bleChar !== null;
+  document.getElementById('btn-print').disabled   = !(hasPDF && connected);
+  document.getElementById('btn-preview').disabled = !hasPDF;
+}
+
+function setProgress(pct, show = true) {
+  const outer = document.getElementById('progress-outer');
+  const inner = document.getElementById('progress-inner');
+  outer.style.display = show ? 'block' : 'none';
+  inner.style.width   = `${pct}%`;
+}
+
+/* ──────────────────────────────────────────────────────
+   Bluetooth – connect
+   ────────────────────────────────────────────────────── */
+async function connectPrinter() {
+  if (!navigator.bluetooth) {
+    logErr('Web Bluetooth API is not available in this browser. Use Chrome/Edge/Opera.');
+    return;
+  }
+
+  logInfo('Requesting Bluetooth device…');
+  try {
+    // Ask browser to show device picker; accept any BLE device
+    // (optionalServices must list the UUIDs we'll access)
+    bleDevice = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: BLE_PROFILES.map(p => p.service),
+    });
+
+    bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+    logInfo(`Device selected: "${bleDevice.name || 'unnamed'}". Connecting…`);
+
+    const server = await bleDevice.gatt.connect();
+    logOk('GATT connected. Discovering services…');
+
+    // Try each profile in order
+    for (const profile of BLE_PROFILES) {
+      try {
+        const service = await server.getPrimaryService(profile.service);
+        logOk(`Service found: ${profile.name} (${profile.service})`);
+
+        const char = await service.getCharacteristic(profile.write);
+        const props = char.properties;
+
+        if (props.write || props.writeWithoutResponse) {
+          bleChar = char;
+          logOk(`Write characteristic ready (writeWithoutResponse=${props.writeWithoutResponse})`);
+          setConnected(true);
+          return;
+        } else {
+          logWarn(`Characteristic ${profile.write} is not writable – trying next profile.`);
+        }
+      } catch {
+        // service not present on this device, try next
+      }
+    }
+
+    // If we're still here, try to find ANY writable characteristic
+    logWarn('Known profiles not found – scanning all services for a writable characteristic…');
+    const services = await server.getPrimaryServices();
+    for (const svc of services) {
+      const chars = await svc.getCharacteristics();
+      for (const ch of chars) {
+        if (ch.properties.write || ch.properties.writeWithoutResponse) {
+          bleChar = ch;
+          logOk(`Found writable char ${ch.uuid} in service ${svc.uuid}`);
+          setConnected(true);
+          return;
+        }
+      }
+    }
+
+    logErr('No writable characteristic found. Is this a supported thermal printer?');
+    bleDevice.gatt.disconnect();
+  } catch (err) {
+    logErr(`Bluetooth error: ${err.message || err}`);
+    bleDevice = null;
+    bleChar   = null;
+    setConnected(false);
+  }
+}
+
+/* ──────────────────────────────────────────────────────
+   Bluetooth – disconnect
+   ────────────────────────────────────────────────────── */
+function disconnectPrinter() {
+  if (bleDevice && bleDevice.gatt.connected) {
+    bleDevice.gatt.disconnect();
+  }
+}
+
+function onDisconnected() {
+  logWarn('Printer disconnected.');
+  bleChar  = null;
+  setConnected(false);
+}
+
+/* ──────────────────────────────────────────────────────
+   Write data to BLE in chunks
+   ────────────────────────────────────────────────────── */
+async function bleWrite(data) {
+  if (!bleChar) throw new Error('Printer not connected');
+
+  const CHUNK = 512;
+  const useWithoutResponse = bleChar.properties.writeWithoutResponse;
+
+  for (let offset = 0; offset < data.length; offset += CHUNK) {
+    const chunk = data.slice(offset, offset + CHUNK);
+    if (useWithoutResponse) {
+      await bleChar.writeValueWithoutResponse(chunk);
+    } else {
+      await bleChar.writeValue(chunk);
+    }
+    // Small delay to avoid overwhelming the printer
+    await delay(20);
+  }
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* ──────────────────────────────────────────────────────
+   ESC/POS helpers
+   ────────────────────────────────────────────────────── */
+const ESC = 0x1b;
+const GS  = 0x1d;
+
+function escposInit() {
+  return new Uint8Array([ESC, 0x40]);            // ESC @
+}
+
+function escposLineSpacing(n) {
+  return new Uint8Array([ESC, 0x33, n]);          // ESC 3 n (n/180 inches)
+}
+
+function escposFeedLines(n) {
+  return new Uint8Array([ESC, 0x64, n]);          // ESC d n
+}
+
+/**
+ * GS v 0 – Print raster bit image (widely supported)
+ * @param {Uint8ClampedArray|Uint8Array} pixels  1-bit packed, MSB first, row by row
+ * @param {number} bytesPerRow  number of packed bytes per row
+ * @param {number} numRows      number of print lines
+ */
+function escposPrintRaster(pixels, bytesPerRow, numRows) {
+  // GS v 0 m xL xH yL yH d1…dk
+  // 0x76 = ASCII 'v', 0x30 = ASCII '0' — these are literal command bytes in the ESC/POS spec
+  const mode = 0x00;               // normal size
+  const xL = bytesPerRow & 0xff;
+  const xH = (bytesPerRow >> 8) & 0xff;
+  const yL = numRows & 0xff;
+  const yH = (numRows >> 8) & 0xff;
+
+  const header = new Uint8Array([GS, 0x76, 0x30, mode, xL, xH, yL, yH]);
+  const result = new Uint8Array(header.length + pixels.length);
+  result.set(header);
+  result.set(pixels, header.length);
+  return result;
+}
+
+/**
+ * ESC * – Print bit image line by line (alternative for printers that don't
+ *          support GS v 0).  We keep this as a fallback but don't call it
+ *          by default.
+ */
+function escposPrintBitImage(pixels, bytesPerRow, numRows) {
+  const MODE = 0x21;       // 24-dot double density
+  const DOT_ROWS = 24;
+  const parts = [];
+
+  for (let y = 0; y < numRows; y += DOT_ROWS) {
+    const band = Math.min(DOT_ROWS, numRows - y);
+    const header = new Uint8Array([
+      ESC, 0x2a, MODE,
+      bytesPerRow & 0xff, (bytesPerRow >> 8) & 0xff,
+    ]);
+    parts.push(header);
+
+    for (let x = 0; x < bytesPerRow; x++) {
+      const col = new Uint8Array(3);
+      for (let row = 0; row < band; row++) {
+        const srcRow = y + row;
+        if (srcRow < numRows) {
+          const byte = pixels[srcRow * bytesPerRow + x];
+          const bit  = 0x80 >> (row % 8);
+          col[Math.floor(row / 8)] |= (byte & bit) ? bit : 0;
+        }
+      }
+      parts.push(col);
+    }
+    parts.push(new Uint8Array([ESC, 0x4a, DOT_ROWS]));
+  }
+
+  const total  = parts.reduce((s, p) => s + p.length, 0);
+  const result = new Uint8Array(total);
+  let off = 0;
+  for (const p of parts) { result.set(p, off); off += p.length; }
+  return result;
+}
+
+function escposCut() {
+  return new Uint8Array([GS, 0x56, 0x41, 0x10]);   // GS V A 16
+}
+
+/* ──────────────────────────────────────────────────────
+   Image processing: PDF page → 1-bit packed bitmap
+   ────────────────────────────────────────────────────── */
+
+/**
+ * Render a single PDF page at 203 DPI scaled to fit printWidth pixels wide,
+ * then dither to 1-bit and pack it.
+ *
+ * @returns {{ pixels: Uint8Array, bytesPerRow: number, height: number, canvas: HTMLCanvasElement }}
+ */
+async function renderPageTo1Bit(page, printWidth) {
+  const viewport0 = page.getViewport({ scale: 1 });
+  const scale     = printWidth / viewport0.width;
+  const viewport  = page.getViewport({ scale });
+
+  const canvas  = document.createElement('canvas');
+  canvas.width  = printWidth;
+  canvas.height = Math.ceil(viewport.height);
+
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  // ── Apply darkness boost ──
+  const darknessMultiplier = parseFloat(document.getElementById('darkness').value) / 100;
+  if (darknessMultiplier !== 1.0) {
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = imageData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      // Boost contrast: pull midtones toward black.
+      // The -100 offset shifts the midpoint of the contrast curve downward,
+      // making the image darker at the chosen multiplier without clipping highlights.
+      const DARKNESS_OFFSET = -100;
+      const luma = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114);
+      const adjusted = Math.min(255, luma * (2 - darknessMultiplier) + (1 - darknessMultiplier) * DARKNESS_OFFSET);
+      d[i] = d[i+1] = d[i+2] = Math.max(0, adjusted);
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  // ── Greyscale ──
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const w = canvas.width, h = canvas.height;
+  const grey  = new Float32Array(w * h);
+  const src   = imgData.data;
+  for (let i = 0; i < w * h; i++) {
+    grey[i] = src[i*4]*0.299 + src[i*4+1]*0.587 + src[i*4+2]*0.114;
+  }
+
+  // ── Dithering ──
+  const mode = document.getElementById('dither-mode').value;
+  const bw = dither(grey, w, h, mode);
+
+  // ── Pack to 1-bit (MSB first) ──
+  const bytesPerRow = Math.ceil(w / 8);
+  const pixels      = new Uint8Array(bytesPerRow * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!bw[y * w + x]) {    // 0 = black → set bit
+        pixels[y * bytesPerRow + Math.floor(x / 8)] |= (0x80 >> (x % 8));
+      }
+    }
+  }
+
+  // ── Build a B&W preview on the canvas ──
+  const previewData = ctx.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) {
+    const v = bw[i] ? 255 : 0;
+    previewData.data[i*4]   = v;
+    previewData.data[i*4+1] = v;
+    previewData.data[i*4+2] = v;
+    previewData.data[i*4+3] = 255;
+  }
+  ctx.putImageData(previewData, 0, 0);
+
+  return { pixels, bytesPerRow, height: h, canvas };
+}
+
+/**
+ * Dither a greyscale Float32Array to a Uint8Array of 0/1 values.
+ */
+function dither(grey, w, h, mode) {
+  const buf = new Float32Array(grey);   // work on a copy
+  const out  = new Uint8Array(w * h);
+
+  const threshold = 128;
+
+  if (mode === 'threshold') {
+    for (let i = 0; i < buf.length; i++) {
+      out[i] = buf[i] >= threshold ? 1 : 0;
+    }
+    return out;
+  }
+
+  if (mode === 'atkinson') {
+    // Atkinson dithering
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i   = y * w + x;
+        const old = buf[i];
+        const nv  = old < threshold ? 0 : 255;
+        out[i]    = nv === 255 ? 1 : 0;
+        const err = (old - nv) / 8;
+
+        // Atkinson spread: each of the 6 neighbours receives 1/8 of the error.
+        // Pattern (relative to current pixel x,y):
+        //   . X 1 1
+        //   1 1 1 .
+        //   . 1 . .
+        const ATKINSON_SPREAD = [[1,0],[2,0],[-1,1],[0,1],[1,1],[0,2]];
+        for (const [dx, dy] of ATKINSON_SPREAD) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && nx < w && ny < h) buf[ny * w + nx] += err;
+        }
+      }
+    }
+    return out;
+  }
+
+  // Floyd-Steinberg (default)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i   = y * w + x;
+      const old = buf[i];
+      const nv  = old < threshold ? 0 : 255;
+      out[i]    = nv === 255 ? 1 : 0;
+      const err = old - nv;
+
+      if (x + 1 < w)        buf[i + 1]     += err * 7 / 16;
+      if (y + 1 < h) {
+        if (x > 0)           buf[i + w - 1] += err * 3 / 16;
+                             buf[i + w]     += err * 5 / 16;
+        if (x + 1 < w)      buf[i + w + 1] += err * 1 / 16;
+      }
+    }
+  }
+  return out;
+}
+
+/* ──────────────────────────────────────────────────────
+   File selection
+   ────────────────────────────────────────────────────── */
+async function onFileSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  currentFile = file;
+  document.getElementById('file-name').textContent = file.name;
+  pdfDoc = null;
+
+  try {
+    logInfo(`Loading "${file.name}" (${(file.size / 1024).toFixed(1)} KB)…`);
+    const ab  = await file.arrayBuffer();
+    pdfDoc    = await pdfjsLib.getDocument({ data: ab }).promise;
+    logOk(`PDF loaded: ${pdfDoc.numPages} page(s).`);
+    updatePrintButton();
+  } catch (err) {
+    logErr(`Failed to load PDF: ${err.message}`);
+    pdfDoc = null;
+    updatePrintButton();
+  }
+}
+
+/* ──────────────────────────────────────────────────────
+   Preview
+   ────────────────────────────────────────────────────── */
+async function previewPDF() {
+  if (!pdfDoc) return;
+  const printWidth = parseInt(document.getElementById('paper-width').value);
+  const container  = document.getElementById('previews');
+  container.innerHTML = '';
+  logInfo('Generating preview…');
+  setProgress(0, true);
+
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    const page   = await pdfDoc.getPage(i);
+    const result = await renderPageTo1Bit(page, printWidth);
+
+    const wrapper  = document.createElement('div');
+    wrapper.className = 'preview-item';
+    const label = document.createElement('span');
+    label.textContent = `Page ${i} — ${result.canvas.width}×${result.canvas.height}`;
+    wrapper.appendChild(result.canvas);
+    wrapper.appendChild(label);
+    container.appendChild(wrapper);
+
+    setProgress((i / pdfDoc.numPages) * 100);
+  }
+  setProgress(100);
+  setTimeout(() => setProgress(0, false), 800);
+  logOk('Preview generated.');
+}
+
+/* ──────────────────────────────────────────────────────
+   Print
+   ────────────────────────────────────────────────────── */
+async function printPDF() {
+  if (!pdfDoc || !bleChar) return;
+
+  const printWidth = parseInt(document.getElementById('paper-width').value);
+  const btnPrint   = document.getElementById('btn-print');
+  btnPrint.disabled = true;
+  setProgress(0, true);
+  logInfo(`Starting print job: ${pdfDoc.numPages} page(s) at ${printWidth} px wide…`);
+
+  try {
+    // Initialise printer
+    await bleWrite(escposInit());
+    await bleWrite(escposLineSpacing(0));     // minimum line spacing
+    await delay(100);
+
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      logInfo(`Processing page ${i}/${pdfDoc.numPages}…`);
+      const page   = await pdfDoc.getPage(i);
+      const result = await renderPageTo1Bit(page, printWidth);
+
+      logInfo(`Sending page ${i}: ${result.bytesPerRow} bytes/row × ${result.height} rows…`);
+      const cmd = escposPrintRaster(result.pixels, result.bytesPerRow, result.height);
+      await bleWrite(cmd);
+
+      // Feed a few lines between pages
+      if (i < pdfDoc.numPages) {
+        await bleWrite(escposFeedLines(4));
+        await delay(300);
+      }
+
+      setProgress((i / pdfDoc.numPages) * 100);
+      logOk(`Page ${i} sent (${(cmd.length / 1024).toFixed(1)} KB).`);
+    }
+
+    // Final feed and cut
+    await bleWrite(escposFeedLines(5));
+    await delay(200);
+    await bleWrite(escposCut());
+    logOk('Print job complete ✓');
+  } catch (err) {
+    logErr(`Print error: ${err.message || err}`);
+  } finally {
+    btnPrint.disabled = false;
+    setProgress(100);
+    setTimeout(() => setProgress(0, false), 800);
+  }
+}
+</script>
+</body>
+</html>
